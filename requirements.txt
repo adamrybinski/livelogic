@@ -1,0 +1,18 @@
+# LiveLogic - Neuro-Symbolic Reasoning Agent
+# Core dependencies
+
+dspy-ai>=2.4.0
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+clingo>=5.7.0
+pydantic>=2.0.0
+
+# Voice (Phase 2)
+# livekit-agents>=0.10.0
+# livekit-plugins-deepgram>=0.5.0
+# livekit-plugins-cartesia>=0.5.0
+
+# Testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+httpx>=0.25.0
