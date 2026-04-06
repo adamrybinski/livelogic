@@ -19,6 +19,7 @@ from .dspy_pipeline import (
     InterpretAnswer,
     extract_facts_with_confidence,
 )
+from .models import EventType
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,20 @@ class SessionStore:
                     input_json TEXT NOT NULL,
                     output_json TEXT NOT NULL,
                     timestamp REAL NOT NULL,
+                    FOREIGN KEY(session_id) REFERENCES sessions(id)
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS timeline_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    timestamp REAL NOT NULL,
+                    event_type TEXT NOT NULL,
+                    version_id TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL,
                     FOREIGN KEY(session_id) REFERENCES sessions(id)
                 )
                 """
@@ -161,6 +176,47 @@ class SessionStore:
             for r in rows
         ]
 
+    def log_event(
+        self,
+        session_id: str,
+        event_type: str,
+        version_id: str,
+        payload: dict[str, Any],
+        metadata: dict[str, Any],
+    ) -> None:
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO timeline_events (session_id, timestamp, event_type, version_id, payload_json, metadata_json)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    session_id,
+                    time.time(),
+                    event_type,
+                    version_id,
+                    json.dumps(payload),
+                    json.dumps(metadata),
+                ),
+            )
+
+    def get_timeline(self, session_id: str) -> list[dict[str, Any]]:
+        with sqlite3.connect(self.db_path) as conn:
+            rows = conn.execute(
+                "SELECT timestamp, event_type, version_id, payload_json, metadata_json FROM timeline_events WHERE session_id=? ORDER BY timestamp",
+                (session_id,),
+            ).fetchall()
+        return [
+            {
+                "timestamp": r[0],
+                "event_type": r[1],
+                "version_id": r[2],
+                "payload": json.loads(r[3]),
+                "metadata": json.loads(r[4]),
+            }
+            for r in rows
+        ]
+
 
 class ReasoningOrchestrator:
     """High-level pipeline: transcript → DSPy → Clingo → response."""
@@ -190,6 +246,13 @@ class ReasoningOrchestrator:
         trace.append({"stage": "extract", "facts": facts_str, "confidence": confidence})
 
         if not facts_str.strip():
+            self.store.log_event(
+                session_id,
+                EventType.ERROR.value,
+                "v1",
+                {"error": "Could not extract facts from transcript"},
+                {"confidence": confidence},
+            )
             return ReasonResponse(
                 status="ERROR",
                 response="I couldn't extract any logical facts from your input. Could you rephrase?",
@@ -197,8 +260,15 @@ class ReasoningOrchestrator:
                 confidence=confidence,
             )
 
-        # 2. Accumulate in session state
+        # 2. Accumulate in session state (emit ASSERT event)
         all_facts = self.store.add_fact(session_id, facts_str.strip())
+        self.store.log_event(
+            session_id,
+            EventType.ASSERT.value,
+            "v1",
+            {"facts": facts_str.strip(), "cumulative": all_facts},
+            {"confidence": confidence},
+        )
         facts_block = "\n".join(all_facts)
 
         # 3. Solve with Clingo
@@ -240,6 +310,14 @@ class ReasoningOrchestrator:
             retraction = getattr(critique, "suggested_retraction", "")
             trace.append({"stage": "critique", "explanation": explanation})
 
+            self.store.log_event(
+                session_id,
+                EventType.CONFLICT_WARNING.value,
+                "v1",
+                {"unsat_core": core_result.unsat_core, "explanation": explanation},
+                {"confidence": confidence, "suggested_retraction": retraction},
+            )
+
             return ReasonResponse(
                 status="UNSAT",
                 response=explanation,
@@ -258,6 +336,14 @@ class ReasoningOrchestrator:
         reasoning = getattr(interpretation, "reasoning_steps", "")
         trace.append({"stage": "interpret", "response": response_text, "reasoning": reasoning})
 
+        self.store.log_event(
+            session_id,
+            EventType.ASSERT.value,
+            "v1",
+            {"result": "SAT", "models": len(result.models)},
+            {"confidence": confidence},
+        )
+
         return ReasonResponse(
             status="SAT",
             response=response_text,
@@ -271,6 +357,13 @@ class ReasoningOrchestrator:
         fact: str,
     ) -> ReasonResponse:
         remaining = self.store.retract_fact(session_id, fact)
+        self.store.log_event(
+            session_id,
+            EventType.RETRACT.value,
+            "v1",
+            {"retracted_fact": fact},
+            {},
+        )
         if not remaining:
             return ReasonResponse(
                 status="SAT",
