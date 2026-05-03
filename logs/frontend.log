@@ -1,0 +1,49 @@
+
+> agent-starter-react@0.1.0 dev /Users/adam/apps/livelogic/agent-ui
+> next dev --turbopack
+
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/adam/package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * /Users/adam/apps/livelogic/agent-ui/pnpm-lock.yaml
+
+   ▲ Next.js 15.5.14 (Turbopack)
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.68.112:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1728ms
+ ○ Compiling / ...
+ ✓ Compiled / in 8.3s
+ GET / 200 in 9142ms
+ GET / 200 in 106ms
+ ○ Compiling /opengraph-image ...
+ ✓ Compiled /opengraph-image in 527ms
+ GET /opengraph-image?10dd23d70afb2d03 200 in 1300ms
+ GET /?id=c44302f1-5a8a-4cb2-af81-91f2c06f9bef&vscodeBrowserReqId=1777802915954 200 in 464ms
+ GET / 200 in 250ms
+ ○ Compiling /api/token ...
+ ✓ Compiled /api/token in 1082ms
+ GET /favicon.ico?favicon.ce48eca7.ico 200 in 1201ms
+ POST /api/token 200 in 1375ms
+ POST /api/token 200 in 288ms
+ POST /api/token 200 in 306ms
+ GET / 200 in 246ms
+ POST /api/token 200 in 297ms
+ GET /favicon.ico?favicon.ce48eca7.ico 200 in 322ms
+ GET /opengraph-image?10dd23d70afb2d03 200 in 825ms
+ GET / 200 in 2876ms
+ POST /api/token 200 in 260ms
+ GET /favicon.ico?favicon.ce48eca7.ico 200 in 265ms
+ POST /api/token 200 in 269ms
+ GET / 200 in 306ms
+ GET /favicon.ico?favicon.ce48eca7.ico 200 in 301ms
+ POST /api/token 200 in 313ms
+ POST /api/token 200 in 259ms
+ GET / 200 in 387ms
+ GET /favicon.ico?favicon.ce48eca7.ico 200 in 369ms
+ POST /api/token 200 in 354ms
+ POST /api/token 200 in 278ms
