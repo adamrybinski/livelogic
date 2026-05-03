@@ -1,131 +1,180 @@
-# LiveLogic - Neuro-Symbolic "Thinking Out Loud" Reasoning Agent
+# LiveLogic - Neuro-Symbolic Reasoning Agents
 
-A voice-enabled reasoning agent that combines **LiveKit** for real-time voice, **DSPy** for structured LLM orchestration, and **Clingo** (Answer Set Programming) as the ground-truth symbolic solver.
+LiveLogic is a voice-enabled reasoning agents system that combines **LiveKit** for real-time voice, **DSPy** for structured LLM orchestration, **Clingo** (Answer Set Programming) as the ground-truth symbolic solver, and a **Next.js React UI**.
 
 ## Mission
 
-LiveLogic delivers mathematically sound security policy advice with full auditability, explainability, and formal proof traces — not probabilistic guesses.
+LiveLogic delivers mathematically sound security policy conversations with full auditability, explainability, and formal proof traces — not probabilistic guesses.
 
-> Unlike traditional LLM agents that can hallucinate policy permissions, LiveLogic converts natural language into first-order logic. It achieves 100% reasoning accuracy within the defined policy bounds by offloading decision-making to a symbolic solver (Clingo), using the LLM only as a linguistic interface.
+> Unlike traditional LLM agents that can hallucinate answers and actions, LiveLogic converts natural language into first-order logic. It achieves 100% reasoning accuracy within the defined policy bounds by delegating decision-making to a symbolic solver (Clingo), using the LLM only as a linguistic interface.
 
-## Architecture
+## Architectures
+
+### Core Neuro-Symbolic Pipeline (Reasoner)
 
 ```
-User Voice → LiveKit Agent (Deepgram STT + Cartesia/OpenAI TTS)
-                                → FastAPI Reasoner
-                                → DSPy Extractor → Session State (SQLite) → Clingo Solver
-                                → DSPy Critic (on UNSAT) → DSPy Translator → TTS + Live Trace UI
+User Input → DSPy Extractor → Session State (SQLite) → Clingo Solver
+                                        → DSPy Critic (on UNSAT) → DSPy Translator → Output + Live Trace
 ```
 
-### Neuro-Symbolic Pipeline
-
-1. **Extract**: Transcript → DSPy → valid ASP facts
-2. **Solve**: Accumulated facts + security.lp → Clingo (multi-model, unsat cores)
+1. **Extract**: Natural language → DSPy → valid ASP facts
+2. **Solve**: Accumulated facts and rules → Clingo (multi-model, unsat cores)
 3. **Critique**: UNSAT → human-readable conflict explanation with suggested retraction
 4. **Translate**: Answer sets → natural language with step-by-step reasoning
 
-### Key Features
+### Voice Pipeline
 
+```
+Browser (localhost:3000)
+    ↓ WebRTC
+LiveKit
+    ↓ 
+Python Agent
+    ↓ Voice API or Chat API
+    ↓
+    DSPy → Clingo → Voice API or Chat API → Browser
+```
+
+## Key Features
+
+### Core Reasoner
 - **State Accumulation**: Per-session fact storage in SQLite with LRU eviction (max 50 facts)
 - **Conflict Detection**: Two-phase consistency checks (syntactic + Clingo UNSAT)
-- **Fact Retraction**: Dedicated endpoint for corrections/interruptions
-- **Proactive Contradiction Alerts**: "Earlier you mentioned X. New fact Y makes this impossible."
-- **Full Audit Trail**: Every turn logged with input/output JSON traces
+- **Fact Retraction**: Dedicated endpoint for corrections
+- **Proactive Contradiction Alerts**
+- **Full Audit Trail**: JSON traces
+
+### Voice UI Demo
+- Real-time voice-to-voice
+- Built-in search tools
+- Audio visualizers and chat transcript
+- Next.js React frontend with shadcn/ui
 
 ## Domain: Security Operations (Incident Triage)
 
-Handles voice queries like "Was this access pattern a policy violation?" by reasoning over:
+Handles queries like "Was this access pattern a policy violation?" reasoning over:
 - User roles and permissions (RBAC)
-- Firewall rules and forbidden subnets
 - Resource access events with temporal constraints
 - Explicit deny rules
+- Session state (active users, resources)
+- Time windows (e.g., "within last 24 hours")
+- Multi-step reasoning (e.g., "Does this user have access to this resource?")
+- Multi-model answers (e.g., "Which of these users could have accessed this resource?")
+- Formal proof traces
+- Policy conflict detection
 
-Returns grounded yes/no answers with formal proof traces.
+Returns answers grounded in formal logic proof traces.
 
-## Quick Start
+## Quickstart: Grok Voice Agent UI Demo
 
 ### Prerequisites
-
-- Python 3.11+
-- Clingo (ASP solver)
-- OpenAI API key (for DSPy)
-
-### Install
-
+- [LiveKit Cloud account](https://cloud.livekit.io)
+- [LLM API key] eg. Grok (https://console.x.ai) with Grok Voice API access
+- Python 3.11+, Node.js/pnpm
+- Clingo
+### 1. Install dependencies
 ```bash
-# Install Clingo
-apt-get install clingo  # Debian/Ubuntu
-# or: brew install clingo  # macOS
+# Backend
+uv pip install livekit-agents[xai,silero,turn-detector] livekit-plugins-noise-cancellation python-dotenv
 
-# Install Python dependencies
-pip install -r requirements.txt
-
-# Set your OpenAI API key
-export OPENAI_API_KEY="sk-..."
+# Frontend
+cd agent-ui
+pnpm install
 ```
 
-### Run the Reasoner
+### 2. Download models
+```bash
+uv run grok_voice_agent_api.py download-files
+```
 
+### 3. Start
+**Recommended: One-command**
+```bash
+./start.sh
+```
+
+**Or separate:**
+- Frontend: `cd agent-ui && pnpm dev` (http://localhost:3000)
+- Backend: `uv run grok_voice_agent_api.py dev`
+
+### 4. Test
+1. Open http://localhost:3000
+2. Click "Start call"
+3. Ask: "What is Elon Musk's most recent X post?"
+
+## Environment Variables
+
+Copy `.env.example` to `.env.local` and fill:
+| Variable | Description |
+|----------|-------------|
+| `LIVEKIT_API_KEY` | LiveKit API key |
+| `LIVEKIT_API_SECRET` | LiveKit API secret |
+| `LIVEKIT_URL` | LiveKit URL (wss://...) |
+| `XAI_API_KEY` | xAI API key |
+
+## Core Reasoner (Standalone)
+
+### Install extras
+```bash
+pip install -r requirements.txt  # DSPy, etc.
+export OPENAI_API_KEY="sk-..."  # or other LLM
+# Install Clingo: brew install clingo / apt-get install clingo
+```
+
+### Run
 ```bash
 uvicorn reasoner.app.main:app --reload --port 8000
 ```
 
-### Run Tests
-
-```bash
-python tests/test_clingo.py
-```
-
 ### API Endpoints
-
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/reason` | Submit transcript for reasoning |
-| POST | `/retract` | Retract a previously added fact |
-| GET | `/trace/{session_id}` | Get full reasoning trace |
-| GET | `/sessions/{session_id}/state` | Get current session state |
-| GET | `/health` | Health check |
+| POST | `/reason` | Submit transcript |
+| POST | `/retract` | Retract fact |
+| GET | `/trace/{session_id}` | Get trace |
+| GET | `/sessions/{session_id}/state` | Session state |
+| GET | `/health` | Health |
 
-### Example Request
-
+**Example:**
 ```bash
-curl -X POST http://localhost:8000/reason \
-  -H "Content-Type: application/json" \
-  -d '{
-    "session_id": "demo-1",
-    "transcript": "User John accessed the database server at 3 AM. John is an analyst."
-  }'
+curl -X POST http://localhost:8000/reason -H "Content-Type: application/json" -d '{\"session_id\": "demo-1", "transcript\": "User John accessed DB at 3AM. John is analyst."}'
+```
+
+## Available Commands
+```bash
+uv run grok_voice_agent_api.py dev     # Voice agent dev
+uv run grok_voice_agent_api.py console # Local console test
+uv run grok_voice_agent_api.py download-files
+python tests/test_clingo.py            # Core tests
 ```
 
 ## Project Structure
-
 ```
-├── reasoner/
-│   ├── asp/
-│   │   └── security.lp          # ASP knowledge base
-│   ├── app/
-│   │   ├── clingo_reasoner.py   # Async Clingo wrapper
-│   │   ├── dspy_pipeline.py     # DSPy signatures + validation
-│   │   ├── orchestrator.py      # Session state + pipeline
-│   │   └── main.py              # FastAPI service
-│   └── data/                    # SQLite session store (auto-created)
-├── agent/
-│   └── livekit_agent.py         # LiveKit voice agent (Phase 2)
-├── frontend/                    # React Live Trace UI (Phase 2)
-├── shared/                      # Shared types and utilities
-├── tests/
-│   └── test_clingo.py           # ClingoReasoner tests
-├── Dockerfile
+├── grok_voice_agent_api.py      # LiveKit + Grok agent
+├── start.sh                     # Start script
+├── agent/                       # Agent code
+├── agent-ui/                    # Next.js UI (full app)
+├── reasoner/                    # Core engine
+│   ├── app/                     # FastAPI + DSPy + Clingo
+│   └── asp/security.lp          # Policy rules
+├── shared/                      # Utils
+├── tests/                       # Tests
 ├── requirements.txt
+├── pyproject.toml
 └── README.md
 ```
 
 ## Roadmap
+- [x] Phase 1: Formal Logic Engine (DSPy + Clingo + FastAPI)
+- [x] Phase 2: Voice UI (LiveKit + Grok + Next.js)
+- [ ] Phase 3: Full integration (Voice → Reasoner pipeline)
+- [ ] Phase 4: Polish, evals, production deploy
 
-- [x] Phase 1: Formal Logic Engine (Symbolic Core + DSPy Bridge + FastAPI)
-- [ ] Phase 2: High-Accuracy Voice & Live Trace UI
-- [ ] Phase 3: Portfolio & Polish (DSPy evals, fallbacks, deployment)
+## Documentation
+- [LiveKit Agents](https://docs.livekit.io/agents)
+- [xAI Grok Voice](https://docs.livekit.io/agents/integrations/xai)
+- [DSPy](https://dspy.ai)
+- [Clingo ASP](https://potassco.org/clingo)
 
 ## License
-
 MIT
