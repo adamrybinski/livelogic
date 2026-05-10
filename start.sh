@@ -37,8 +37,14 @@ if lsof -i :7880 > /dev/null 2>&1; then
 fi
 
 # Start backend (Python agent) with hot reload using watchfiles
-echo -e "${YELLOW}Starting backend agent with hot reload...${NC}"
-watchfiles 'grok_voice_agent_api.py' -- uv run python grok_voice_agent_api.py dev > logs/backend.log 2>&1 &
+echo -e "${YELLOW}Starting backend agent (no hot reload)...${NC}"
+source agent-ui/.env
+echo "LIVEKIT_URL: $LIVEKIT_URL"
+echo "PATH: $PATH"
+which uv
+uv --version
+uv sync
+uv run python grok_voice_agent_api.py dev > logs/backend.log 2>&1 &
 BACKEND_PID=$!
 echo "Backend PID: $BACKEND_PID"
 

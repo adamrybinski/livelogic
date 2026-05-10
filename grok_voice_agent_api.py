@@ -12,14 +12,14 @@ from livekit.agents import (
     room_io,
 )
 from livekit.plugins import silero, xai
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
+#from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 # uncomment lines 18 and 66-68 to enable Krisp background voice/noise cancellation
 # from livekit.plugins import noise_cancellation
 
 logger = logging.getLogger("agent")
 
-load_dotenv(".env.local")
+load_dotenv("agent-ui/.env")
 
 
 class Assistant(Agent):
@@ -50,7 +50,7 @@ async def my_agent(ctx: JobContext):
 
     session = AgentSession(
         llm=xai.realtime.RealtimeModel(voice="ara"),
-        turn_detection=MultilingualModel(),
+        # turn_detection=MultilingualModel(),
         tools=[xai.realtime.XSearch(), xai.realtime.WebSearch()],
         vad=ctx.proc.userdata["vad"],
         preemptive_generation=True,
